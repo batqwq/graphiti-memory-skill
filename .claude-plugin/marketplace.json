@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "graphiti-memory-skill",
+  "description": "A skill that teaches an AI agent to use the Graphiti MCP knowledge-graph memory correctly.",
+  "owner": {
+    "name": "batqwq"
+  },
+  "plugins": [
+    {
+      "name": "graphiti-memory",
+      "description": "Persistent knowledge-graph memory via the Graphiti MCP server — safe read/write/verify/delete workflows for episodes, entities, and facts.",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/batqwq/graphiti-memory-skill"
+    }
+  ]
+}

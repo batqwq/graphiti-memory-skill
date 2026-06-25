@@ -1,0 +1,10 @@
+{
+  "name": "graphiti-memory",
+  "description": "Persistent knowledge-graph memory via the Graphiti MCP server. Teaches an AI agent to read, write, verify, and delete graph memory (episodes → entities → facts) safely — pinning group_id, verifying before claiming success, and using the right tool per layer. Use whenever the user wants to remember, recall, or manage durable cross-session memory.",
+  "version": "1.0.0",
+  "author": {
+    "name": "batqwq"
+  },
+  "homepage": "https://github.com/batqwq/graphiti-memory-skill",
+  "license": "MIT"
+}

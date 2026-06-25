@@ -1,0 +1,43 @@
+{
+  "skill_name": "graphiti-memory",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Remember that my staging deploy script lives at infra/deploy/staging.sh and it has to run after the db migration step, not before — I keep getting this backwards. Save it to my 'work-infra' memory group.",
+      "expected_output": "Writes one coherent episode via add_memory with group_id='work-infra', explicit entity names and the ordering relationship (deploy script runs after db migration), then polls get_memory_queue_status for the same group until pending=0 and processing=0, then verifies with search_memory_facts before telling the user it's saved.",
+      "files": [],
+      "expectations": [
+        "Calls add_memory with group_id set to 'work-infra'",
+        "The episode body names the script path and the after-migration ordering explicitly rather than using vague pronouns",
+        "Polls get_memory_queue_status with the same group_id after writing",
+        "Verifies retrievability with search_memory_facts (or search_nodes) before claiming success",
+        "Does not report 'saved' on the basis of the add_memory queue confirmation alone"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What do you actually know about the AI-Memory project's database setup? Check our memory before answering.",
+      "expected_output": "Asks for or uses a confirmed group_id, then runs search_memory_facts with a focused natural-language question (not keywords), inspects an important hit with get_entity_edge, and reports findings as candidates grounded in facts/episodes rather than quoting a node summary as truth. Treats an empty result as 'not found yet', not proof of absence.",
+      "files": [],
+      "expectations": [
+        "Uses search_memory_facts as the primary retrieval tool for the factual question",
+        "Passes an explicit group_ids value (or asks the user which group if unknown) rather than searching across all groups",
+        "Phrases the query as a focused natural-language question, not a keyword bag",
+        "Verifies an important fact with get_entity_edge instead of relying on a node summary",
+        "Does not present an empty search result as definitive proof that nothing is stored"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "That note I saved earlier saying I use Postgres is wrong — I moved to Neo4j months ago. Fix the memory in my 'work-infra' group.",
+      "expected_output": "Locates the relevant fact with search_memory_facts in group 'work-infra', confirms the exact item, and corrects it — preferably by adding a new accurate episode (Graphiti supersedes old facts) rather than reflexively deleting. If deleting, verifies the exact UUID via get_entity_edge first and re-searches afterward. Does not call clear_graph.",
+      "files": [],
+      "expectations": [
+        "Searches the 'work-infra' group to locate the specific outdated fact before acting",
+        "Prefers adding a corrected episode (superseding) or, if deleting, verifies the exact UUID with get_entity_edge first",
+        "Re-verifies the group after the change and reports what was actually observed",
+        "Does not use clear_graph or delete unrelated items to 'clean up'"
+      ]
+    }
+  ]
+}
