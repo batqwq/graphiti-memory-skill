@@ -1,14 +1,6 @@
 ---
 name: graphiti-memory
-description: >-
-  基于 Graphiti MCP 服务器的持久化知识图谱记忆。当用户想要记住、存储、回忆、查找、核对、
-  更正或删除需要跨会话长期保留的事实、关系、偏好、决定、人物、项目或历史时,使用本 skill ——
-  包括对 Graphiti 工具 add_memory、search_memory_facts、search_nodes、get_episodes、
-  get_entity_edge、get_memory_queue_status、delete_entity_edge、delete_episode、clear_graph
-  的任何调用。触发场景:"记住这件事"、"帮我存到记忆/知识图谱"、"你还记得关于 X 的事吗"、
-  "回忆一下我们之前的决定"、"查一下记忆里有没有…"、核对或更正已存内容,以及任何带 group_id
-  的分组操作 —— 即使用户没有明说 "Graphiti"。Graphiti 是一张图(情节 → 实体 → 事实),其工具
-  行为与扁平键值存储差别很大,调用前请先参考本 skill。
+description: "基于 Graphiti MCP 的持久化知识图谱记忆。当用户想记住、存储、回忆、查找、核对、更正或删除跨会话的事实、关系、偏好、决定、人物、项目或历史时使用,包括 add_memory、search_memory_facts、search_nodes、get_episodes、get_entity_edge、get_memory_queue_status、delete_entity_edge、delete_episode、clear_graph 的任何调用。触发场景:记住这件事、帮我存到记忆、你还记得 X 吗、回忆之前的决定、查记忆里有没有、核对或更正已存内容,以及任何 group_id 分组操作,即使没提到 Graphiti。Graphiti 是图(情节→实体→事实),和键值存储差别很大,调用前先看本 skill。"
 ---
 
 # Graphiti 记忆
