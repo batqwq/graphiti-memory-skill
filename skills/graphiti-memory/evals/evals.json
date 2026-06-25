@@ -7,6 +7,7 @@
       "expected_output": "用 add_memory 写入一条自洽的情节,group_id='work-infra',点名实体并写明顺序关系(部署脚本在数据库迁移之后跑);随后用相同 group_id 轮询 get_memory_queue_status 直到 pending=0 且 processing=0;再用 search_memory_facts 验证可检索后,才告诉用户已存好。",
       "files": [],
       "expectations": [
+        "写入前先用 search_memory_facts 在 'work-infra' 分组查重,确认没有相同或高度相似的已存事实",
         "调用 add_memory 时 group_id 设为 'work-infra'",
         "情节内容明确写出脚本路径和'在迁移之后'的顺序,而不是用含糊的代词",
         "写入后用相同的 group_id 轮询 get_memory_queue_status",
