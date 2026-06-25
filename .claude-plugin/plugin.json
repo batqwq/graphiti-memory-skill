@@ -1,10 +1,12 @@
 {
   "name": "graphiti-memory",
-  "description": "基于 Graphiti MCP 服务器的持久化知识图谱记忆。教 AI 智能体安全地读、写、验证和删除图记忆(情节 → 实体 → 事实)—— 钉死 group_id、没验证过不说成功、按层选对工具。当用户想记住、回忆或管理跨会话的长期记忆时使用。",
   "version": "1.0.0",
+  "description": "基于 Graphiti MCP 服务器的持久化知识图谱记忆。教 AI 智能体安全地读、写、验证和删除图记忆(情节→实体→事实)。",
   "author": {
     "name": "batqwq"
   },
   "homepage": "https://github.com/batqwq/graphiti-memory-skill",
-  "license": "MIT"
+  "repository": "https://github.com/batqwq/graphiti-memory-skill",
+  "license": "MIT",
+  "keywords": ["graphiti", "mcp", "knowledge-graph", "memory", "neo4j"]
 }

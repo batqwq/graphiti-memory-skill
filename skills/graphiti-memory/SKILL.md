@@ -1,121 +1,92 @@
 ---
 name: graphiti-memory
-description: "基于 Graphiti MCP 的持久化知识图谱记忆。当用户想记住、存储、回忆、查找、核对、更正或删除跨会话的事实、关系、偏好、决定、人物、项目或历史时使用,包括 add_memory、search_memory_facts、search_nodes、get_episodes、get_entity_edge、get_memory_queue_status、delete_entity_edge、delete_episode、clear_graph 的任何调用。触发场景:记住这件事、帮我存到记忆、你还记得 X 吗、回忆之前的决定、查记忆里有没有、核对或更正已存内容,以及任何 group_id 分组操作,即使没提到 Graphiti。Graphiti 是图(情节→实体→事实),和键值存储差别很大,调用前先看本 skill。"
+description: "This skill should be used when the user asks to \"remember this\", \"save to memory\", \"recall what we discussed\", \"what do you know about X\", \"check memory for\", \"correct that memory\", \"delete that fact\", \"clear the graph\", or uses any Graphiti MCP tool (add_memory, search_memory_facts, search_nodes, get_episodes, get_entity_edge, get_memory_queue_status, delete_entity_edge, delete_episode, clear_graph). Also use when the user mentions group_id, knowledge graph memory, or cross-session persistence — even without saying \"Graphiti\". Graphiti is a graph (episodes to entities to facts) that behaves very differently from a key-value store; consult this skill before calling its tools."
+version: 1.0.0
 ---
 
 # Graphiti 记忆
 
-Graphiti 是一个**持久化知识图谱记忆服务**。它不是把文档原样存下来供你逐字读回 —— 它先摄入
-**源情节(episode)**,再由 LLM 在后台从中抽取**实体(节点)**与**关系事实(边)**。你检索到
-的是"含义",不是"文件"。要拿到好结果,必须尊重这种结构,所以动手前先读本节。
+Graphiti 是持久化知识图谱记忆服务。它摄入**源情节(episode)**,由 LLM 在后台抽取**实体(节点)**
+与**关系事实(边)**。检索的是含义,不是原文。
 
-## 心智模型:三个层次
+## 三层结构
 
-| 层次 | 它是什么 | 读取它的工具 |
-|------|---------|--------------|
-| **情节 Episode** | 你写入的原始素材 —— 一条笔记、一段消息、一条 JSON 记录。是事实依据与出处。 | `get_episodes` |
-| **节点 Node(实体)** | 从情节中抽取出的人、项目、地点或事物。带名称、生成的摘要和 UUID。 | `search_nodes` |
-| **边 Edge(事实)** | 实体之间的关系,带时间有效性(如"用户偏好深色模式",自某日期起生效)。 | `search_memory_facts` → `get_entity_edge` |
+| 层 | 含义 | 读取工具 |
+|----|------|----------|
+| 情节 | 写入的原始素材(笔记、消息、JSON) | `get_episodes` |
+| 节点(实体) | 抽取出的人/项目/地点/事物 | `search_nodes` |
+| 边(事实) | 实体间的关系,带时间有效性 | `search_memory_facts` → `get_entity_edge` |
 
-写入是**自上而下**的(你添加一条情节,实体和事实随后被异步派生)。读取通常从**事实**层开始,
-只有当某个论断很关键时,才向下追溯到出处。
+写入自上而下(添加情节 → 异步派生实体和事实);读取从事实层开始,需要时追溯出处。
 
-## 两条不可妥协的规则
+## 两条核心规则
 
-这两条直接来自服务器的操作契约。违反它们会产生"自信但错误"的回答,或污染彼此的记忆,所以请
-把它们当作承重墙来对待。
+**1. 钉死 group_id。** 每个分组作用域的调用必须带已确认的确切 group_id/group_ids。分组是硬隔离。
+不清楚时先问用户,绝不猜测、臆造、扩大范围或省略。
 
-**1. 每次都钉死 group_id。** 每个分组作用域的调用都必须带上用户或可信上下文已确认的确切
-group_id(或 group_ids)。分组是硬隔离 —— 把它想成各自独立的笔记本。绝不要猜测、臆造、改名、
-扩大范围或悄悄省略,也绝不跨组检索,因为来自错误分组的"看似合理"的结果和正确结果长得一模一样。
-**如果你不知道分组,先问用户再调用工具** —— 不要自己挑默认值。
-
-**2. 没验证过就别说成功。** 搜索结果是按相关性排序的**候选**,不是证据。写入只是被**排队**了,
-不等于完成。删除一条事实后,派生出的相似事实可能还在。所以任何写入、更正、删除之后,都要跑一遍
-下文的后续核对,并如实汇报你**实际观察到**的结果 —— 而不是你想要的结果。
+**2. 先验证再说成功。** 搜索结果是候选而非证据;写入只是排队;删除可能不完全传播。任何变更后,
+跑后续核对并汇报实际观察到的结果。
 
 ## 选对工具
 
 ```
-关于某个事实/关系/"什么时候…"的问题       → search_memory_facts
-需要找到某个实体或拿到它的 UUID            → search_nodes
-想看你已找到的某条事实的完整细节           → get_entity_edge
-"这是哪来的?"/ 最近的原始历史              → get_episodes
-用户想让你记住某件事                        → add_memory
-我刚写入的完成了吗?                        → get_memory_queue_status
-服务还活着吗?                              → get_status
-用户明确要求删除某一条事实/情节             → delete_entity_edge / delete_episode
-用户明确要求清空整个分组                    → clear_graph(见"破坏性操作")
+事实/关系/时间问题           → search_memory_facts
+发现实体或拿 UUID            → search_nodes
+查看一条事实的完整细节       → get_entity_edge
+出处/原始历史                → get_episodes
+记住某件事                   → add_memory
+写入是否完成                 → get_memory_queue_status
+服务是否在线                 → get_status
+删除一条事实/情节            → delete_entity_edge / delete_episode
+清空整个分组                 → clear_graph（见破坏性操作）
 ```
 
-完整的参数表、默认值和别名见 [`references/tools.md`](references/tools.md) —— 当你需要确切的参数名,
-或本次会话里第一次使用某个工具时,去读它。
+完整参数表见 [`references/tools.md`](references/tools.md)。
 
 ## 读取流程
 
-1. **凡是事实、关系或时间相关的问题,先用 `search_memory_facts`。** 把问题组织成一句聚焦的自然
-   语言**疑问句**,点名实体、关系和时间约束 —— 例如"AI-Memory 项目截至 2026 年用的是哪个数据库?"。
-   一堆关键词检索效果差,因为查询是作为整体被向量化的。
-2. **只在需要发现实体或拿 UUID 时用 `search_nodes`。** 节点的摘要是生成出来的上下文,不是权威
-   证据 —— 别把它当事实引用。它的主要用途是给你一个 `center_node_uuid`,回传给
-   `search_memory_facts` 把搜索聚焦到该实体周围。
-3. **用 `get_entity_edge`** 拉取完整的已存事实(出处、生效/失效日期、属性),在你依赖它做任何
-   要紧的事之前。
-4. **当用户问某条记忆的来源,或要回顾最近的原始历史时,用 `get_episodes`。** 这是出处核对,不是
-   语义搜索。
-5. **空结果不等于不存在。** 在断定"什么都没存"之前,换更具体的查询、再核对 group_id,并查一下
-   `get_memory_queue_status`,以防相关写入还在处理中。
+1. 对事实/关系/时间问题,先用 `search_memory_facts`。写一句聚焦的自然语言疑问句,点名实体、关系和
+   时间约束。不要用关键词堆砌——查询作为整体被向量化。
+2. 仅在需要发现实体或拿 UUID 时用 `search_nodes`。节点摘要是生成的上下文,非权威证据。
+3. 用 `get_entity_edge` 核实重要事实的出处和时间字段。
+4. 用 `get_episodes` 做出处核对或回顾原始历史。
+5. 空结果不等于不存在——换更具体的查询、核对 group_id、检查 `get_memory_queue_status`。
 
 ## 写入流程
 
-1. **写入前先查重。** 用 `search_memory_facts` 在同一分组里搜一下,看有没有已存的相同或高度
-   相似的事实。如果已经存在且内容准确,直接告诉用户"已经记着了",不要重复写入。如果已存但内容
-   过时或不完整,走更正流程(添加一条新的准确情节来取代)而不是再叠一条。只有确认没有相似记录时
-   才写入新情节。
-2. **一次 `add_memory` 只写一条自洽的情节。** 写明确的实体名称(不要用代词)、它们之间的关系、
-   日期、信息来源,以及任何不确定性。把"他/它/那个"解析成真实名称 —— 后台抽取器没有别的上下文,
-   含糊的文本只会产出垃圾实体。不要把多个不相关事件塞进一条情节;拆开。
-3. **只存用户真正想记住的东西。** 不要悄悄把猜测、推断或工作草稿持久化下来。记忆是长期的,会再
-   冒出来。
-4. **`add_memory` 只是把情节排进队列。** 返回值只确认"已排队",仅此而已。用**相同的 group_id**
-   轮询 `get_memory_queue_status`,直到 `pending` 和 `processing` 都为 `0`。任何非零的 `failed`
-   计数或 `last_error` 都必须摆出来调查 —— 只要还有失败,就绝不汇报"导入成功"。
-5. **说"存好了"之前先验证。** 队列清空后,在该分组里跑一次 `search_memory_facts`(或
-   `search_nodes`),确认这条事实确实能检索到,再告诉用户你查到了什么。
-
-**一条好情节的示例:**
-> 名称(name):`AI-Memory 基础设施`
-> 内容(episode_body):*"截至 2026-05-31,AI-Memory 项目(owner 为 batqwq)使用 Neo4j 作为
-> Graphiti 记忆的图数据库。嵌入模型已从 Gemini 迁移到经 OpenRouter 的 Qwen3-embedding-8b。"*
-
-它点名了实体、陈述了关系、锚定了日期、注明了出处 —— 抽取出来就是干净的节点和事实。
+1. **先查重。** 用 `search_memory_facts` 在同一分组搜索有没有相同或高度相似的已存事实。已存且准确
+   则告知用户"已记着了";已存但过时则走更正流程。仅确认无相似记录时才写入。
+2. **一次 `add_memory` 写一条自洽的情节。** 写明确的实体名称(不用代词)、关系、日期、出处和
+   不确定性。多个不相关事件拆开。
+3. **只存用户真正想记住的内容。** 不要悄悄持久化猜测或工作草稿。
+4. **轮询队列。** 用相同 group_id 调用 `get_memory_queue_status`,直到 pending=0 且
+   processing=0。非零 failed 或 last_error 必须汇报。
+5. **验证可检索。** 队列清空后用 `search_memory_facts` 确认事实能检索到,再告知用户。
 
 ## 更正与删除
 
-删除是外科手术式的、需明确指令 —— 它**不是**清理、去重或"这看着不对"的工具。只删除用户点名的
-那一条,且仅在他们明确要求时。
+优先**添加新的准确情节**来取代旧事实(Graphiti 双时态,新事实自动取代旧的),而非删除。
 
-1. **定位并确认 UUID。** 用 `search_memory_facts` 找到事实,再用 `get_entity_edge` 核实(或用
-   `get_episodes` 找到情节)。绝不要传猜来的 UUID。
-2. **删除那一条具体项**:`delete_entity_edge`(一条事实)或 `delete_episode`(一条源情节)。注意:
-   删掉情节并不保证从它派生的每个节点或事实都被清除,而残留的情节可能导致相似事实被重新派生。
-3. **在同一分组里重新搜索并汇报核实后的结果** —— 别假定删除已经传播开。
+删除仅用于用户明确要求移除的那一条:
+1. 用 `search_memory_facts` 定位,`get_entity_edge` 核实 UUID。绝不猜 UUID。
+2. 调用 `delete_entity_edge`(事实)或 `delete_episode`(情节)。
+3. 事后在同一分组重新搜索并汇报核实结果。
 
-要更正一条错误的事实,通常是**添加一条新的、准确的情节**,而不是删除 —— Graphiti 是双时态的,
-会用更新的事实取代旧的。把删除留给那些必须被真正抹掉的信息。
+### 破坏性操作：clear_graph
 
-### 破坏性操作:`clear_graph`
-
-`clear_graph` 会不可逆地抹掉指定分组里的**每一条**情节、节点和事实,且不创建备份。只有当用户
-明确要求重置、点名了每一个目标分组、并确认可以永久删除时,才调用它。三者缺一,就停下来问。绝不
-要用它去"修复"空的、嘈杂的或重复的结果。
+不可逆地抹掉指定分组的全部数据,无备份。仅当用户明确要求重置、点名每个目标分组、且确认永久删除时
+才调用。三者缺一则停下来问。绝不用它来"修复"嘈杂/重复的结果。
 
 ## 常见陷阱
 
-- **不查重就写入** —— 写之前先搜一下;重复情节会产出重复事实,污染检索结果。
-- **省略 group_id**,因为某个默认值"看起来很明显" —— 应该去问。
-- **把搜索第一名当真相** —— 对任何要紧的事,先用 `get_entity_edge` 核实再行动。
-- **`add_memory` 之后就报"存好了"** —— 它只是排队了;先轮询队列并验证。
-- **关键词堆砌式查询** —— Graphiti 把整个查询串向量化;请写成一句真正的疑问句。
-- **把节点摘要当事实引用** —— 摘要是生成的、可能过时;事实边才是证据。
-- **为了"清理"而删除** —— 删除只用于明确点名的移除。
+- 不查重就写入 → 重复情节产出重复事实
+- 省略 group_id → 结果来自错误分组
+- 搜索第一名当真相 → 应先 `get_entity_edge` 核实
+- add_memory 后直接报"存好了" → 只是排队,先轮询再验证
+- 关键词堆砌查询 → 写成疑问句
+- 节点摘要当事实引用 → 摘要是生成的,事实边才是证据
+- 为"清理"而删除 → 删除只用于明确点名的移除
+
+## 参考文件
+
+- **[`references/tools.md`](references/tools.md)** — 全部 9 个工具的参数、默认值、别名和调用注意事项
