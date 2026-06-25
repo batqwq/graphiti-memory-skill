@@ -60,4 +60,4 @@ graphiti-memory-skill/
 
 ## 许可证
 
-[MIT](LICENSE) © 2026 batqwq
+[MIT](skills/graphiti-memory/LICENSE.txt) © 2026 batqwq

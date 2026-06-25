@@ -1,7 +1,10 @@
 ---
 name: graphiti-memory
-description: "This skill should be used when the user asks to \"remember this\", \"save to memory\", \"recall what we discussed\", \"what do you know about X\", \"check memory for\", \"correct that memory\", \"delete that fact\", \"clear the graph\", or uses any Graphiti MCP tool (add_memory, search_memory_facts, search_nodes, get_episodes, get_entity_edge, get_memory_queue_status, delete_entity_edge, delete_episode, clear_graph). Also use when the user mentions group_id, knowledge graph memory, or cross-session persistence — even without saying \"Graphiti\". Graphiti is a graph (episodes to entities to facts) that behaves very differently from a key-value store; consult this skill before calling its tools."
-version: 1.0.0
+description: Persistent knowledge-graph memory via Graphiti MCP. Use when the user asks to remember, store, recall, look up, verify, correct, or delete durable facts, relationships, or history that should survive across sessions. Covers add_memory, search_memory_facts, search_nodes, get_episodes, get_entity_edge, get_memory_queue_status, delete_entity_edge, delete_episode, clear_graph. Also triggers for save to memory, what do you know about X, check memory, correct that memory, or any group_id operation, even without mentioning Graphiti.
+license: Complete terms in LICENSE.txt
+metadata:
+  author: batqwq
+  version: "1.0.0"
 ---
 
 # Graphiti 记忆
