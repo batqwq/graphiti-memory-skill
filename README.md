@@ -1,114 +1,104 @@
 # graphiti-memory-skill
 
-An **[Agent Skill](https://www.anthropic.com/news/agent-skills)** that teaches an AI
-agent to use the [Graphiti](https://github.com/getzep/graphiti) MCP server correctly —
-a persistent **knowledge-graph memory** that survives across sessions.
+一个 **Agent Skill**,教 AI 智能体正确使用 [Graphiti](https://github.com/getzep/graphiti)
+MCP 服务器 —— 一种能跨会话存续的**知识图谱记忆**。
 
-Graphiti speaks the open [Model Context Protocol](https://modelcontextprotocol.io), so
-it is **not Claude-only**: any MCP-capable agent — Claude Code, Claude Desktop, Cursor,
-Cline, or your own custom agent — can connect to it, and this skill's guidance applies
-to all of them. It ships as a Claude Code plugin/skill for one-command install, but
-`SKILL.md` is plain, portable Markdown that any agent can load.
+Graphiti 走的是开放的 [Model Context Protocol(MCP)](https://modelcontextprotocol.io),所以它
+**不是 Claude 专属**:任何支持 MCP 的智能体 —— Claude Code、Claude Desktop、Cursor、Cline,或你
+自己写的智能体 —— 都能接它,本 skill 的指引对它们都适用。它打包成 Claude Code 插件/skill 以便
+一条命令安装,但 `SKILL.md` 是任何智能体都能加载的普通 Markdown。
 
-Graphiti isn't a flat key-value store. It ingests *source episodes*, then extracts
-*entities* and *relationship facts* from them in the background. That graph shape makes
-its tools easy to misuse — searching the wrong partition, treating a ranked guess as
-truth, or reporting "saved!" when a write is still queued. This skill encodes the
-correct workflows so the agent reads, writes, verifies, and deletes memory safely.
+Graphiti 不是扁平的键值存储。它先摄入**源情节(episode)**,再在后台从中抽取**实体**与**关系
+事实**。这种图结构让它的工具很容易被误用 —— 搜错了分组、把排序靠前的猜测当真相,或者写入还在
+排队就报"已保存"。本 skill 把正确的工作流固化下来,让智能体安全地读、写、验证和删除记忆。
 
-## What it covers
+## 它涵盖什么
 
-- **The mental model** — episodes → entities (nodes) → facts (edges), and which tool reads each layer.
-- **Two non-negotiable rules** — always pin the `group_id`; never claim success without verifying.
-- **Reading workflow** — facts-first retrieval, entity discovery, provenance, and why "empty" ≠ "absent".
-- **Writing workflow** — coherent episodes, async queue polling, and post-write verification.
-- **Correcting & deleting** — surgical, explicit deletion; superseding facts via new episodes; the destructive `clear_graph` guardrails.
-- **A full tool reference** — every parameter, default, and alias for all 9 Graphiti tools, in [`references/tools.md`](skills/graphiti-memory/references/tools.md).
+- **心智模型** —— 情节 → 实体(节点)→ 事实(边),以及读取每一层各用哪个工具。
+- **两条不可妥协的规则** —— 每次都钉死 `group_id`;没验证过就别说成功。
+- **读取流程** —— 事实优先的检索、实体发现、出处核对,以及为何"空"≠"没有"。
+- **写入流程** —— 自洽的情节、异步队列轮询、写后验证。
+- **更正与删除** —— 外科手术式、需明确指令的删除;用新情节取代旧事实;`clear_graph` 的破坏性护栏。
+- **完整工具参考** —— 全部 9 个 Graphiti 工具的每个参数、默认值和别名,见
+  [`references/tools.md`](skills/graphiti-memory/references/tools.md)。
 
-## Prerequisites
+## 前置条件
 
-A running **Graphiti MCP server** connected to your agent / MCP client (Claude Code,
-Claude Desktop, Cursor, Cline, or any MCP-capable agent), exposing the standard
-Graphiti tools (`add_memory`, `search_memory_facts`, `search_nodes`, `get_episodes`,
-`get_entity_edge`, `get_memory_queue_status`, `delete_entity_edge`, `delete_episode`,
-`clear_graph`). See the
-[Graphiti MCP server docs](https://github.com/getzep/graphiti/tree/main/mcp_server).
+一个正在运行、并已接入你的智能体 / MCP 客户端(Claude Code、Claude Desktop、Cursor、Cline,或
+任何支持 MCP 的智能体)的 **Graphiti MCP 服务器**,暴露标准 Graphiti 工具(`add_memory`、
+`search_memory_facts`、`search_nodes`、`get_episodes`、`get_entity_edge`、
+`get_memory_queue_status`、`delete_entity_edge`、`delete_episode`、`clear_graph`)。参见
+[Graphiti MCP 服务器文档](https://github.com/getzep/graphiti/tree/main/mcp_server)。
 
-The skill itself is provider- and agent-agnostic — it teaches *how* to drive the tools
-and does not hardcode any server URL, group IDs, or credentials.
+skill 本身与具体提供方、具体智能体无关 —— 它教的是*如何驱动这些工具*,不硬编码任何服务器 URL、
+分组 ID 或凭据。
 
-## Install
+## 安装
 
-Options A and B use **Claude Code**'s plugin/skill loader; Option C works for any other
-agent.
+方式 A、B 走 **Claude Code** 的插件/skill 加载器;方式 C 适用于任何其它智能体。
 
-### Option A — as a Claude Code plugin (recommended)
+### 方式 A —— 作为 Claude Code 插件(推荐)
 
-This repo is also a self-contained plugin marketplace:
+本仓库同时是一个自包含的插件市场(marketplace):
 
 ```
 /plugin marketplace add batqwq/graphiti-memory-skill
 /plugin install graphiti-memory@graphiti-memory-skill
 ```
 
-### Option B — as a personal skill, manual copy (Claude Code)
+### 方式 B —— 作为个人 skill,手动复制(Claude Code)
 
-Copy the skill folder into your user skills directory:
+把 skill 文件夹复制进你的用户 skill 目录:
 
 ```bash
 git clone https://github.com/batqwq/graphiti-memory-skill.git
 cp -r graphiti-memory-skill/skills/graphiti-memory ~/.claude/skills/
 ```
 
-Then restart Claude Code (or reload skills). The skill triggers automatically when a
-task involves remembering, recalling, or managing Graphiti memory — you don't invoke
-it by hand.
+然后重启 Claude Code(或重新加载 skill)。当任务涉及记住、回忆或管理 Graphiti 记忆时,skill 会
+自动触发 —— 你不用手动调用它。
 
-### Option C — any other MCP-capable agent
+### 方式 C —— 任何其它支持 MCP 的智能体
 
-The skill is just portable Markdown, so feed it to your agent however it loads
-instructions — a system prompt, a rules file (e.g. a Cursor or Cline rule), a retrieved
-doc, or your framework's own skill mechanism:
+skill 就是可移植的 Markdown,所以按你的智能体加载指令的方式喂给它即可 —— 系统提示词、规则文件
+(如 Cursor 或 Cline 的 rule)、检索到的文档,或你框架自带的 skill 机制:
 
 ```bash
 git clone https://github.com/batqwq/graphiti-memory-skill.git
-# Point your agent at:
-#   skills/graphiti-memory/SKILL.md            (workflows + the two rules)
-#   skills/graphiti-memory/references/tools.md (full tool parameter reference)
+# 把智能体指向:
+#   skills/graphiti-memory/SKILL.md            (工作流 + 两条规则)
+#   skills/graphiti-memory/references/tools.md (完整工具参数参考)
 ```
 
-The workflows and tool reference are agent-neutral; only the install glue differs.
+工作流和工具参考与智能体无关;只有安装这层"胶水"不同。
 
-## Repository layout
+## 仓库结构
 
 ```
 graphiti-memory-skill/
 ├── README.md
 ├── LICENSE
 ├── .claude-plugin/
-│   ├── plugin.json            # plugin manifest (Claude Code)
-│   └── marketplace.json       # self-referential marketplace (Claude Code)
+│   ├── plugin.json            # 插件清单(Claude Code)
+│   └── marketplace.json       # 自包含市场(Claude Code)
 └── skills/
     └── graphiti-memory/
-        ├── SKILL.md           # the skill (workflows + rules) — agent-neutral
+        ├── SKILL.md           # skill 本体(工作流 + 规则)—— 与智能体无关
         ├── references/
-        │   └── tools.md       # full per-tool parameter reference
+        │   └── tools.md       # 完整的逐工具参数参考
         └── evals/
-            └── evals.json     # sample test prompts for the skill
+            └── evals.json     # skill 的示例测试 prompt
 ```
 
-## How it works
+## 工作原理
 
-In Claude Code, a skill loads in three stages (progressive disclosure): the `name` +
-`description` are always in context; `SKILL.md` loads when the skill triggers; and
-`references/tools.md` is pulled in only when exact parameters are needed. This keeps
-the always-on footprint small while making deep detail available on demand. Other
-agents can mirror this layering or just load `SKILL.md` directly — nothing in the
-content depends on a Claude-specific feature.
+在 Claude Code 里,skill 分三级加载(渐进式披露):`name` + `description` 始终在上下文里;
+`SKILL.md` 在 skill 触发时加载;`references/tools.md` 仅在需要确切参数时才拉进来。这让常驻开销很小,
+同时把深层细节按需提供。其它智能体可以照搬这种分层,也可以直接加载 `SKILL.md` —— 内容不依赖任何
+Claude 专属特性。
 
-## License
+## 许可证
 
 [MIT](LICENSE) © 2026 batqwq
 
-Graphiti is a trademark of its respective authors; this is an independent,
-community-authored skill and is not affiliated with Zep / Graphiti.
+Graphiti 是其各自作者的商标;本项目是独立的、社区编写的 skill,与 Zep / Graphiti 无隶属关系。

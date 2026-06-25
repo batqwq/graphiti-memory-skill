@@ -1,172 +1,152 @@
-# Graphiti MCP — Tool Reference
+# Graphiti MCP — 工具参考
 
-Exact parameters, defaults, and behavior for every Graphiti MCP tool. The actual
-tool names are namespaced by the MCP server (commonly
-`mcp__<server>__<tool>`, e.g. `mcp__Graphiti__add_memory`); the logical names
-below match the ones the server documents.
+每个 Graphiti MCP 工具的确切参数、默认值与行为。实际工具名由 MCP 服务器加命名空间前缀(通常是
+`mcp__<server>__<tool>`,例如 `mcp__Graphiti__add_memory`);下面用的是服务器文档里的逻辑名。
 
-Read [`../SKILL.md`](../SKILL.md) first for the workflows and the two
-non-negotiable rules. This file is the lookup table.
+先读 [`../SKILL.md`](../SKILL.md) 了解流程和两条不可妥协的规则。本文件是查表用的。
 
-## Contents
+## 目录
 
-- [Writing](#writing) — `add_memory`
-- [Reading](#reading) — `search_memory_facts`, `search_nodes`, `get_entity_edge`, `get_episodes`
-- [Status](#status) — `get_status`, `get_memory_queue_status`
-- [Deleting](#deleting) — `delete_entity_edge`, `delete_episode`, `clear_graph`
+- [写入](#写入) — `add_memory`
+- [读取](#读取) — `search_memory_facts`、`search_nodes`、`get_entity_edge`、`get_episodes`
+- [状态](#状态) — `get_status`、`get_memory_queue_status`
+- [删除](#删除) — `delete_entity_edge`、`delete_episode`、`clear_graph`
 
 ---
 
-## Writing
+## 写入
 
 ### `add_memory`
 
-Queue **one** source episode for asynchronous extraction into the graph. Returns
-only confirmation that the episode was *queued* — not that processing finished.
+把**一条**源情节排队,异步抽取进图。返回值只确认情节已**排队** —— 不代表处理完成。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `name` | string | — (required) | Short, stable, descriptive title for the episode. |
-| `episode_body` | string | — (required) | The full source content. For `source="json"`, pass a JSON-**encoded string**, not an object. |
-| `group_id` | string \| null | `null` | The exact confirmed group. Mandatory in practice — ask the user if unknown; do not omit or guess. |
-| `source` | string | `"text"` | `"text"` (prose), `"json"` (JSON-encoded string), or `"message"` (conversation-style). |
-| `source_description` | string | `""` | Brief provenance, e.g. document type or conversation context. |
-| `uuid` | string \| null | `null` | Optional caller-supplied stable episode UUID. Normally omit. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `name` | string | —(必填) | 该情节的简短、稳定、描述性标题。 |
+| `episode_body` | string | —(必填) | 完整源内容。当 `source="json"` 时,传 JSON **编码后的字符串**,而非对象。 |
+| `group_id` | string \| null | `null` | 已确认的确切分组。实践中必填 —— 不知道就问用户;不要省略或猜测。 |
+| `source` | string | `"text"` | `"text"`(散文)、`"json"`(JSON 编码字符串)或 `"message"`(对话式)。 |
+| `source_description` | string | `""` | 简短出处,如文档类型或对话上下文。 |
+| `uuid` | string \| null | `null` | 可选的调用方自带稳定情节 UUID。通常省略。 |
 
-**After calling:** poll [`get_memory_queue_status`](#get_memory_queue_status) with the
-same `group_id` until `pending=0` and `processing=0`, then verify with
-[`search_memory_facts`](#search_memory_facts). Write explicit names, relationships,
-dates, provenance, and uncertainty; one event per episode; no pronouns or
-keyword fragments.
+**调用后:** 用相同的 `group_id` 轮询 [`get_memory_queue_status`](#get_memory_queue_status),直到
+`pending=0` 且 `processing=0`,再用 [`search_memory_facts`](#search_memory_facts) 验证。写明确的
+名称、关系、日期、出处和不确定性;一条情节只放一个事件;不用代词或关键词碎片。
 
 ---
 
-## Reading
+## 读取
 
 ### `search_memory_facts`
 
-Primary retrieval tool. Searches derived relationship **facts (edges)** by semantic
-meaning. Use for factual, relational, and temporal questions.
+主检索工具。按语义搜索派生出的关系**事实(边)**。用于事实、关系和时间相关的问题。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `query` | string | — (required) | One focused natural-language question naming the entities, relationship, and any time constraint. Not a keyword list. |
-| `group_ids` | string[] \| null | `null` | Exact confirmed groups. Mandatory in practice — never broaden or search across unconfirmed groups. |
-| `center_node_uuid` | string \| null | `null` | Optional entity-node UUID (from `search_nodes`) to focus retrieval around that entity. Pass a real UUID, never a name. |
-| `max_facts` | integer | `10` | Max ranked facts to return; positive, server-capped. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `query` | string | —(必填) | 一句聚焦的自然语言疑问句,点名实体、关系和时间约束。不是关键词列表。 |
+| `group_ids` | string[] \| null | `null` | 已确认的确切分组。实践中必填 —— 绝不扩大范围或跨未确认分组检索。 |
+| `center_node_uuid` | string \| null | `null` | 可选的实体节点 UUID(来自 `search_nodes`),把检索聚焦到该实体周围。传真实 UUID,绝不传名称。 |
+| `max_facts` | integer | `10` | 返回的最大排序事实数;正整数,受服务器上限约束。 |
 
-Results are relevance-ranked **candidates**, not guaranteed truth. Inspect important
-ones with `get_entity_edge`.
+结果是按相关性排序的**候选**,不是保证为真。重要的用 `get_entity_edge` 核实。
 
 ### `search_nodes`
 
-Discover entity **nodes** by name, alias, role, summary, or meaning. Use for entity
-discovery or to obtain a UUID — not for relationship questions (use
-`search_memory_facts` for those).
+按名称、别名、角色、摘要或语义发现实体**节点**。用于实体发现或获取 UUID —— 不用于关系问题
+(那些用 `search_memory_facts`)。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `query` | string | — (required) | Focused entity lookup: a canonical name, alias, role, or identifying context. |
-| `group_ids` | string[] \| null | `null` | Exact confirmed groups. Mandatory in practice. |
-| `entity_types` | string[] \| null | `null` | Optional exact configured entity labels to filter by. Omit if unknown. |
-| `max_nodes` | integer | `10` | Max ranked nodes; positive, server-capped. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `query` | string | —(必填) | 聚焦的实体查找:规范名、别名、角色或可识别的上下文。 |
+| `group_ids` | string[] \| null | `null` | 已确认的确切分组。实践中必填。 |
+| `entity_types` | string[] \| null | `null` | 可选,按配置的确切实体标签过滤。不清楚就省略。 |
+| `max_nodes` | integer | `10` | 返回的最大排序节点数;正整数,受服务器上限约束。 |
 
-A node's `summary` is generated context and may be stale — verify critical claims
-against facts or episodes. Empty results are not proof of absence.
+节点的 `summary` 是生成的上下文,可能过时 —— 关键论断要对照事实或情节核实。空结果不等于不存在。
 
 ### `get_entity_edge`
 
-Retrieve the full stored representation of **one** fact (edge) by UUID. Read-only.
+按 UUID 取回**一条**事实(边)的完整已存表示。只读。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `uuid` | string | — (required) | Exact fact UUID from `search_memory_facts` in the confirmed group. Never guess. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `uuid` | string | —(必填) | 来自 `search_memory_facts`、在已确认分组中的确切事实 UUID。绝不猜测。 |
 
-Use it to inspect provenance, temporal fields (valid-from / valid-to), and attributes
-before relying on or deleting a fact.
+用它在依赖或删除一条事实之前,检查其出处、时间字段(生效/失效)和属性。
 
 ### `get_episodes`
 
-List raw source **episodes** from one or more groups in deterministic `created_at`
-order. Provenance / recent-history inspection — **not** semantic search.
+按 `created_at` 的确定顺序,列出一个或多个分组的原始**源情节**。出处 / 近期历史核对 ——
+**不是**语义搜索。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `group_ids` | string[] \| null | `null` | Exact confirmed groups. Preferred over the legacy `group_id`. |
-| `max_episodes` | integer \| null | `null` | Preferred page size; positive, server-capped. |
-| `offset` | integer | `0` | Episodes to skip, for pagination. |
-| `sort_order` | string | `"desc"` | `"desc"` (newest first) or `"asc"` (oldest first). |
-| `content_max_chars` | integer | `1200` | Per-episode preview length; `0` omits content previews. |
-| `group_id` | string \| null | `null` | Legacy single-group alias. Prefer `group_ids`. |
-| `limit` / `last_n` | integer \| null | `null` | Legacy page-size aliases. Prefer `max_episodes`; don't pass disagreeing values. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `group_ids` | string[] \| null | `null` | 已确认的确切分组。优先于旧版 `group_id`。 |
+| `max_episodes` | integer \| null | `null` | 首选页大小;正整数,受服务器上限约束。 |
+| `offset` | integer | `0` | 用于分页时跳过的情节数。 |
+| `sort_order` | string | `"desc"` | `"desc"`(最新在前)或 `"asc"`(最旧在前)。 |
+| `content_max_chars` | integer | `1200` | 每条情节的预览长度;`0` 表示不返回内容预览。 |
+| `group_id` | string \| null | `null` | 旧版单分组别名。优先用 `group_ids`。 |
+| `limit` / `last_n` | integer \| null | `null` | 旧版页大小别名。优先用 `max_episodes`;不要传互相矛盾的值。 |
 
-Use it to locate and verify an episode UUID before `delete_episode`.
+用它在 `delete_episode` 之前定位并核实一个情节 UUID。
 
 ---
 
-## Status
+## 状态
 
 ### `get_status`
 
-Connectivity diagnostic only — confirms the MCP service is initialized and can reach
-its graph database. No parameters.
+仅连通性诊断 —— 确认 MCP 服务已初始化、能访问其图数据库。无参数。
 
-A healthy result does **not** imply queues are empty, memories exist, or that LLM /
-embedding providers are working for new writes. Use `get_memory_queue_status` for
-ingestion health.
+结果健康**不**代表队列已空、记忆存在,或 LLM / 嵌入提供方对新写入正常工作。摄入健康度请用
+`get_memory_queue_status`。
 
 ### `get_memory_queue_status`
 
-Inspect asynchronous ingestion progress without modifying the graph.
+检查异步摄入进度,不修改图。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `group_id` | string \| null | `null` | The group whose queue you're checking. After `add_memory`, pass the **same** group_id. Omit only for an explicit admin-wide overview. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `group_id` | string \| null | `null` | 要检查队列的分组。`add_memory` 之后,传**相同的** group_id。仅在做全局管理总览时省略。 |
 
-A group is caught up only when `pending` **and** `processing` are both `0`. Report any
-`failed` count or `last_error`; a non-zero `retried` count indicates transient
-JSON-output failures that auto-recovered (useful when diagnosing reliability).
+只有当 `pending` **和** `processing` 都为 `0` 时,该分组才算追平。任何 `failed` 计数或
+`last_error` 都要汇报;非零的 `retried` 表示瞬时 JSON 输出失败已自动恢复(诊断可靠性时有用)。
 
 ---
 
-## Deleting
+## 删除
 
-> Deletion is surgical and explicit. Only remove the exact item the user named, on
-> their explicit request. Never delete because results look duplicated, stale, noisy,
-> or wrong. See [SKILL.md → Correcting and deleting](../SKILL.md#correcting-and-deleting).
+> 删除是外科手术式的、需明确指令。只移除用户点名的那一条,且仅在他们明确要求时。绝不要因为结果
+> 看着重复、过时、嘈杂或不对就删。见 [SKILL.md → 更正与删除](../SKILL.md#更正与删除)。
 
 ### `delete_entity_edge`
 
-Permanently delete exactly one derived **fact (edge)** by UUID.
+按 UUID 永久删除恰好一条派生**事实(边)**。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `uuid` | string | — (required) | Exact fact UUID, located via `search_memory_facts` and verified with `get_entity_edge`. Never guess. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `uuid` | string | —(必填) | 经 `search_memory_facts` 定位、`get_entity_edge` 核实的确切事实 UUID。绝不猜测。 |
 
-Does not delete the source episode or connected nodes; a surviving episode may cause a
-similar fact to be re-derived. Re-search the same group afterward to confirm.
+不会删除源情节或相连的节点;残留的情节可能导致相似事实被重新派生。事后在同一分组重新搜索以确认。
 
 ### `delete_episode`
 
-Permanently delete exactly one source **episode** by UUID.
+按 UUID 永久删除恰好一条源**情节**。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `uuid` | string | — (required) | Exact episode UUID, verified via `get_episodes`. Never guess. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `uuid` | string | —(必填) | 经 `get_episodes` 核实的确切情节 UUID。绝不猜测。 |
 
-Removes the source record and its direct links, but does not guarantee removal of
-every node, derived fact, or summary it influenced. Verify in the same group after.
+移除该源记录及其直接连接,但不保证清除它曾影响的每个节点、派生事实或生成的摘要。事后在同一分组核实。
 
 ### `clear_graph`
 
-**Irreversible.** Deletes all episodes, nodes, and facts in the named group
-partition(s). No backup is created.
+**不可逆。** 删除指定分组分区里的所有情节、节点和事实。不创建备份。
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `group_ids` | string[] \| null | `null` | Explicit list of every group the user named and authorized for permanent erasure. Never omit, guess, or broaden. |
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `group_ids` | string[] \| null | `null` | 用户点名并授权永久抹除的每一个分组的显式列表。绝不省略、猜测或扩大范围。 |
 
-Only call when the user has explicitly asked to reset, named every target group, and
-confirmed permanent deletion is acceptable. Not a cleanup, dedupe, migration, or
-troubleshooting tool. Verify only the authorized groups afterward and report the
-result.
+只有当用户明确要求重置、点名了每一个目标分组、并确认可以永久删除时,才调用。它不是清理、去重、
+迁移或排障工具。事后只核实被显式授权的分组,并汇报结果。
